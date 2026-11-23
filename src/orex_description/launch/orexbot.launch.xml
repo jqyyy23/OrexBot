@@ -1,0 +1,20 @@
+<launch>
+  <!-- OrexBot description viewer: robot_state_publisher + joint sliders + RViz.
+       (The old map->root static_transform_publisher "90 deg orientation fix" was removed;
+        set RViz's Fixed Frame to "root".) -->
+
+  <!-- robot_state_publisher: process the URDF (xacro passes plain URDF through unchanged)
+       and publish /tf for every joint. robot_description must be the URDF *string*, which
+       $(command ...) produces by running xacro at launch time. -->
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" output="screen">
+    <param name="robot_description"
+           value="$(command 'xacro $(find-pkg-share orex_description)/urdf/robot_w_gun.urdf')"/>
+  </node>
+
+  <!-- joint_state_publisher_gui: sliders to move the movable joints for viewing.
+       (Replace with the real /gun/joint_states + /head/joint_states feed later.) -->
+  <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" output="screen"/>
+
+  <!-- RViz 3D visualizer. -->
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"/>
+</launch>

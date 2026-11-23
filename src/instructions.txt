@@ -1,0 +1,110 @@
+Instructions for setting up the drone tracking system for the robot head
+
+The head has two parts:
+  * HOST (this PC): camera + vision_node (YOLO+TrackerVit) + micro-ROS agent.
+  * ESP32: flashed firmware that drives the pan/tilt servos (see HEAD CONTROL).
+Flash + power the ESP32 first, then bring up the host side (quick start or manual).
+
+═══════════════════════════════════════════════════════════════════════════════
+QUICK START — one launch file (camera + vision + agent)
+═══════════════════════════════════════════════════════════════════════════════
+    cd ~/github/OrexBot                           # MUST be the workspace root (not src/, not the firmware dir)
+    source /opt/ros/jazzy/setup.bash
+    colcon build --packages-select orex_head_vision --symlink-install   # once, to install the launch file
+    source install/setup.bash                     # this is ~/github/OrexBot/install
+    source ~/uros_ws/install/setup.bash           # so the micro-ROS agent resolves
+    ros2 launch orex_head_vision bringup.launch.py agent_port:=/dev/ttyACM0
+
+  - Starts camera + vision_node + micro-ROS agent together; Ctrl+C stops all.
+  - Runs vision_node under the workspace .venv automatically (no shebang fix needed).
+  - Toggles: start_camera:=false  start_vision:=false  start_agent:=false
+  - The turret HUD is separate — open it with step 4 below when you want eyes on it.
+
+═══════════════════════════════════════════════════════════════════════════════
+MANUAL BRINGUP — separate terminals
+═══════════════════════════════════════════════════════════════════════════════
+1. In every terminal, set up the environment (from the WORKSPACE ROOT):
+
+    cd ~/github/OrexBot                  # NOT src/ and NOT the firmware dir
+    source /opt/ros/jazzy/setup.bash    # ROS 2 system
+    source .venv/bin/activate           # python env (Ultralytics)
+    source install/setup.bash           # Orex workspace (~/github/OrexBot/install)
+
+2. Camera (RGB + depth + IMU):
+
+    ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true enable_gyro:=true enable_accel:=true unite_imu_method:=1
+
+3. Vision node (YOLO + TrackerVit; publishes /head/angular_error, /head/target_locked, ...):
+
+    # One-time: fetch the TrackerVit model (gitignored, ~0.7MB). If missing, the node
+    # warns and falls back to YOLO-only acquisition.
+    #   mkdir -p src/orex_head_vision/models && curl -fsSL \
+    #     https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/object_tracking_vittrack/object_tracking_vittrack_2023sep.onnx \
+    #     -o src/orex_head_vision/models/vittrack.onnx
+
+    colcon build --packages-select orex_head_vision --symlink-install   # picks up code changes
+    sed -i '1s|^#!.*$|#!/home/jay/github/OrexBot/.venv/bin/python|' install/orex_head_vision/lib/orex_head_vision/vision_node
+    source install/setup.bash
+    ros2 run orex_head_vision vision_node
+
+4. Turret HUD (optional viewer). Separate, on-demand; vision runs headless and is
+   unaffected whether the HUD is open or not. Close the window with 'q' or ESC.
+
+    source install/setup.bash
+    ros2 run orex_head_vision turret_view
+
+   The window appears immediately showing "WAITING FOR CAMERA" until frames arrive,
+   then switches to the live feed with the crosshair / reticle / LOCKED-SEARCHING HUD.
+   If NO window appears at all, see "TURRET HUD DISPLAY" below.
+
+5. If you see duplicate vision nodes, stop old instances first:
+
+    pkill -f orex_head_vision/vision_node || true
+    pkill -f 'ros2 run orex_head_vision vision_node' || true
+
+═══════════════════════════════════════════════════════════════════════════════
+TURRET HUD DISPLAY — WSL / GUI setup
+═══════════════════════════════════════════════════════════════════════════════
+The HUD opens an OpenCV window, which needs a working display (WSLg on WSL2).
+
+  a) Check the display is set in THIS terminal:
+        echo $DISPLAY                 # expect :0   (if empty:  export DISPLAY=:0 )
+
+  b) Decisive test — does ANY OpenCV window appear?
+        python3 -c "import cv2, numpy as np; cv2.imshow('t', np.zeros((200,300,3), np.uint8)); cv2.waitKey(3000)"
+     - A small black window pops for 3s  -> display is fine; run turret_view normally.
+     - Nothing appears                   -> force the X11 backend (next line).
+
+  c) If nothing appeared, force Qt to use X11 (Xwayland), then run the HUD:
+        QT_QPA_PLATFORM=xcb python3 -c "import cv2, numpy as np; cv2.imshow('t', np.zeros((200,300,3), np.uint8)); cv2.waitKey(3000)"
+        QT_QPA_PLATFORM=xcb ros2 run orex_head_vision turret_view
+
+  Notes:
+   - Make sure WSLg is available (other Linux GUI apps should show up). Update WSL on
+     Windows if needed:  wsl --update  (from PowerShell).
+   - turret_view runs under system python3 (cv2 with Qt5 GUI); it needs no venv/YOLO.
+
+═══════════════════════════════════════════════════════════════════════════════
+HEAD CONTROL — ESP32 micro-ROS
+═══════════════════════════════════════════════════════════════════════════════
+Firmware: src/orex_head_control/Drone tracker/ (PlatformIO). Flags in include/config.h.
+
+FLASH (ESP32-S3 native USB needs manual download mode):
+    # 1) stop the agent so /dev/ttyACM* is free
+    # 2) hold BOOT, tap RST, release BOOT   (enters ROM bootloader)
+    # 3) find the port and upload:
+    ls -t /dev/ttyACM*
+    cd "src/orex_head_control/Drone tracker" && pio run -t upload --upload-port /dev/ttyACM1
+
+AGENT (host-side bridge, built once at ~/uros_ws) — its own terminal:
+    source /opt/ros/jazzy/setup.bash
+    source ~/uros_ws/install/setup.bash
+    ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 -v4
+  - Do NOT run `pio device monitor` at the same time (port conflict).
+  - Healthy: ONE "session established", then quiet. Endless establish/delete = a problem.
+  - If it never connects, tap the ESP32 reset once the agent is up.
+
+MANUAL HEAD TEST (decoupled from vision — needs BOTH topics streaming):
+    ros2 topic pub -r 20 /head/target_locked std_msgs/msg/Bool "{data: true}" &
+    ros2 topic pub -r 20 /head/angular_error geometry_msgs/msg/Vector3 "{x: 0.0, y: -0.15, z: 0.0}"
+  y>0 tilts DOWN, y<0 tilts UP, x>0 pans RIGHT. Ctrl+C -> watchdog holds after 250 ms.

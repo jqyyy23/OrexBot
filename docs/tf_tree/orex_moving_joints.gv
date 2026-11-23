@@ -1,0 +1,29 @@
+digraph G {
+rankdir=TB;
+node [shape=box, style="rounded,filled", fillcolor="#E7F1F0", color="#0E7C86", fontname="Helvetica", fontsize=11];
+edge [color="#14202B", fontname="Helvetica", fontsize=9];
+"map" [fillcolor="#14202B", fontcolor="#F4F1EA"];
+"map" -> "root" [label="static"];
+"root" -> "satellite_top_v8_6" [label="bicep_roll_rotation_left"];
+"root" -> "satellite_top_v8_1" [label="bicep_roll_rotation_right"];
+"root" -> "satellite_top_v8_4" [label="elbow_pitch_flexion_left"];
+"root" -> "elbow_2_forearm_1_v12" [label="elbow_pitch_flexion_right"];
+"bearing6706_30x37x4_v1_2" -> "forearm_yaw_shaft_v3_1" [label="forearm_roll_rotation_left"];
+"root" -> "forearm_yaw_shaft_v3" [label="forearm_roll_rotation_right"];
+"root" -> "forearm_roll_mount_v2_v2" [label="revolute"];
+"forearm_pitch_output_shaft_v4" -> "linkage_14mm_v2_1" [label="revolute_1"];
+"linkage_14mm_v2" -> "forearm_pitch_input_shaft_v5__1__loop_closure" [label="revolute_10_loop_closure"];
+"root" -> "shoul_base_v4_v10" [label="revolute_12"];
+"root" -> "shoul_base_v4_v10_1" [label="revolute_13"];
+"forearm_pitch_output_shaft_v4" -> "linkage_14mm_v2_3" [label="revolute_2"];
+"linkage_14mm_v2_3" -> "forearm_pitch_input_shaft_v5__2__loop_closure" [label="revolute_5_loop_closure"];
+"root" -> "linkage_14mm_v2_2" [label="revolute_6"];
+"root" -> "linkage_14mm_v2" [label="revolute_8"];
+"linkage_14mm_v2_2" -> "forearm_pitch_input_shaft_v5" [label="revolute_9"];
+"root" -> "satellite_top_v8_3" [label="shoulder_pitch_roll_left"];
+"root" -> "satellite_top_v8" [label="shoulder_pitch_roll_right"];
+"shoul_base_v4_v10_1" -> "shoul_servo_mount_v13_1" [label="shoulder_yaw_pan__base_joint__left"];
+"shoul_base_v4_v10" -> "shoul_servo_mount_v13" [label="shoulder_yaw_pan__base_joint__right"];
+"root" -> "forearm_pitch_output_shaft_v4" [label="wrist_pitch_flexion"];
+"root" -> "bearing6706_30x37x4_v1_2" [label="wrist_pitch_flexion_left"];
+}

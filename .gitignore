@@ -1,0 +1,35 @@
+# ROS2 Build artifacts
+build/
+install/
+log/
+
+# Python environment and caches
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model and debug artifacts
+weights/
+*.pt
+*.onnx
+/tmp/yolo_debug.jpg
+/tmp/vision_debug.jpg
+*.jpg
+*.png
+
+# OS/Editor temporary files
+.DS_Store
+*.swp
+*~
+*Zone.Identifier
+
+# Personal
+docs/ros2_learnings_log.md
+sessions/
+.claude/

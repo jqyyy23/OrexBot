@@ -1,0 +1,59 @@
+digraph Orex {
+  rankdir=LR;
+  graph [fontname="Helvetica", fontsize=16, nodesep=0.35, ranksep=0.6, pad=0.3, bgcolor="#F4F1EA"];
+  node  [fontname="Helvetica", fontsize=12, shape=box, style="rounded,filled", fillcolor="#FFFFFF", color="#14202B", penwidth=1.4];
+  edge  [fontname="Helvetica", fontsize=10, color="#3D4C58", fontcolor="#0A5A62", penwidth=1.3];
+
+  // ---------- Head: drone tracking (real hardware) ----------
+  subgraph cluster_head {
+    label="Head: drone tracking (real hardware)"; labeljust=l; fontcolor="#0A5A62";
+    style="rounded,filled"; fillcolor="#E7F1F0"; color="#0E7C86";
+
+    cam    [label="realsense2_camera\nIntel RealSense D455", fillcolor="#D6E7F5"];
+    vision [label="vision_tracking\nYOLO + ViT tracker\n6-state Kalman filter", fillcolor="#FFE9C7", color="#B4461F", penwidth=2];
+    agent  [label="micro_ros_agent\n(serial)"];
+    esp    [label="ESP32-S3 head controller\nmicro-ROS node", fillcolor="#D6E7F5"];
+    servos [label="Pan / tilt servos\nHiwonder HX-30HM", shape=box3d, fillcolor="#D9D3C4"];
+    view   [label="turret_view\noverlay UI"];
+
+    cam -> vision [label="color, depth,\ncamera_info, IMU"];
+    cam -> view   [label="color image"];
+    vision -> agent [label="/head/angular_error\n/head/target_locked"];
+    agent -> esp [label="XRCE-DDS", style=dashed];
+    esp -> servos [label="servo bus"];
+    vision -> view [label="/head/target_point\n/head/target_velocity\n/head/target_locked"];
+  }
+
+  // ---------- Robot state / visualisation ----------
+  subgraph cluster_state {
+    label="Robot model and TF"; labeljust=l; fontcolor="#0A5A62";
+    style="rounded,filled"; fillcolor="#EFEBE1"; color="#8FA2B0";
+
+    jsp  [label="joint_state_publisher"];
+    rsp  [label="robot_state_publisher\nrobot_w_gun.urdf"];
+    rviz [label="RViz", fillcolor="#D6E7F5"];
+
+    jsp -> rsp [label="/joint_states"];
+    rsp -> rviz [label="/tf"];
+  }
+  esp -> jsp [label="/head/joint_states"];
+
+  // ---------- Gun arm: aiming ----------
+  subgraph cluster_arm {
+    label="Gun arm: aiming (IK tested in sim)"; labeljust=l; fontcolor="#0A5A62";
+    style="rounded,filled"; fillcolor="#F3E3DB"; color="#B4461F";
+
+    target [label="fake_target_node\n(test target)", style="rounded,dashed,filled"];
+    ik     [label="ik_solver_node\njoint velocities via IK", fillcolor="#FFE9C7", color="#B4461F", penwidth=2];
+    mock   [label="mock_hardware_node\nintegrates velocities"];
+    armif  [label="move_arm\nreal gun-arm servos", fillcolor="#D9D3C4"];
+
+    target -> ik [label="/target_point"];
+    ik -> mock [label="/joint_velocities"];
+  }
+  mock  -> rsp [label="/joint_states", style=dashed];
+  armif -> rsp [label="/joint_states"];
+
+  // Planned link
+  vision -> ik [xlabel="planned, not wired", style=dotted, color="#B4461F", fontcolor="#B4461F", constraint=false];
+}
